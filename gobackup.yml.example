@@ -49,9 +49,11 @@ models:
         # Set to false if using properly signed certificates
         trustServerCertificate: true
         
-        # Optional: Additional sqlpackage arguments
-        # Uncomment and customize as needed:
-        # args: "/p:CompressionOption=Maximum /p:VerifyExtraction=true"
+        # Explicitly pass certificate trust setting to sqlpackage
+        # This ensures certificate validation is handled correctly
+        # Additional sqlpackage arguments can be appended to this
+        # Example: args: "/SourceTrustServerCertificate:True /p:CompressionOption=Maximum"
+        args: "/SourceTrustServerCertificate:True"
     
     # Storage configuration - where backups will be uploaded
     storages:

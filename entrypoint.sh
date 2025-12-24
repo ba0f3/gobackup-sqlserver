@@ -23,7 +23,16 @@ log_info "Starting GoBackup SQL Server container"
 
 # Validate required environment variables
 validate_required_env() {
-    log_info "Validating required environment variables"
+    local config_file="/etc/gobackup/gobackup.yml"
+    
+    # Skip validation if config file already exists (user-provided)
+    if [ -f "${config_file}" ]; then
+        log_info "Configuration file exists at ${config_file}, skipping environment variable validation"
+        log_info "Using user-provided configuration"
+        return 0
+    fi
+    
+    log_info "Validating required environment variables for config generation"
     
     local missing_vars=()
     
@@ -63,7 +72,9 @@ validate_required_env() {
         for var in "${missing_vars[@]}"; do
             log_error "  - ${var}"
         done
-        log_error "Please set all required environment variables and try again"
+        log_error "Please either:"
+        log_error "  1. Set all required environment variables, OR"
+        log_error "  2. Mount your own gobackup.yml config file to /etc/gobackup/gobackup.yml"
         exit 1
     fi
     
@@ -96,6 +107,14 @@ generate_config() {
     export MINIO_ENDPOINT MINIO_BUCKET MINIO_REGION MINIO_PATH MINIO_ACCESS_KEY MINIO_SECRET_KEY
     export MINIO_TIMEOUT MINIO_MAX_RETRIES BACKUP_CRON
     
+    # Set MSSQL_ARGS based on MSSQL_TRUST_CERT to explicitly pass certificate trust to sqlpackage
+    # This ensures certificate validation is handled correctly even if GoBackup doesn't pass it properly
+    if [ "${MSSQL_TRUST_CERT:-true}" = "true" ]; then
+        export MSSQL_ARGS="/SourceTrustServerCertificate:True"
+    else
+        export MSSQL_ARGS="/SourceTrustServerCertificate:False"
+    fi
+    
     # Substitute variables and write to config file
     envsubst < "${template_file}" > "${config_file}"
     
@@ -124,6 +143,12 @@ generate_config() {
 test_sql_connection() {
     if [ "${SKIP_HEALTH_CHECK}" = "true" ]; then
         log_info "Skipping SQL Server health check (SKIP_HEALTH_CHECK=true)"
+        return 0
+    fi
+    
+    # Skip if MSSQL variables are not set (using custom config)
+    if [ -z "${MSSQL_HOST}" ] || [ -z "${MSSQL_DATABASE}" ] || [ -z "${MSSQL_PASSWORD}" ]; then
+        log_info "Skipping SQL Server health check (MSSQL variables not set)"
         return 0
     fi
     
@@ -164,6 +189,12 @@ test_sql_connection() {
 test_minio_connection() {
     if [ "${SKIP_HEALTH_CHECK}" = "true" ]; then
         log_info "Skipping MinIO health check (SKIP_HEALTH_CHECK=true)"
+        return 0
+    fi
+    
+    # Skip if MinIO variables are not set (using custom config)
+    if [ -z "${MINIO_ENDPOINT}" ] || [ -z "${MINIO_BUCKET}" ]; then
+        log_info "Skipping MinIO health check (MinIO variables not set)"
         return 0
     fi
     

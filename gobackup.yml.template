@@ -51,9 +51,10 @@ models:
         # Set to "true" for self-signed certificates or non-production environments
         trustServerCertificate: ${MSSQL_TRUST_CERT:-true}
         
-        # Optional: Additional sqlpackage arguments
-        # Uncomment and customize as needed:
-        # args: "/p:CompressionOption=Maximum /p:VerifyExtraction=true"
+        # Explicitly pass certificate trust setting to sqlpackage
+        # This ensures certificate validation is handled correctly
+        # Additional sqlpackage arguments can be appended to this
+        args: "${MSSQL_ARGS:-/SourceTrustServerCertificate:True}"
     
     # Storage configuration - where backups will be uploaded
     storages:
