@@ -23,7 +23,8 @@ jobs:
     permissions:
       contents: read
       packages: write
-      id-token: write  # Required for artifact attestation
+      id-token: write      # Required for OIDC token requests
+      attestations: write  # Required to persist attestations to GitHub
 
     steps:
       - name: Checkout repository
