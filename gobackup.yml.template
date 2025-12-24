@@ -1,0 +1,145 @@
+# GoBackup Configuration Template for SQL Server Backups to MinIO
+# This template uses environment variable substitution with ${VAR_NAME:-default_value} syntax
+# Variables without defaults are required and must be set when running the container
+
+# Models define backup jobs - you can have multiple models for different databases
+models:
+  # Model name - identifies this backup configuration
+  sqlserver_backup:
+    # Human-readable description of this backup job
+    description: "SQL Server automated backup to MinIO"
+    
+    # Backup schedule configuration using cron syntax
+    # Format: "minute hour day month weekday"
+    # Examples:
+    #   "0 2 * * *"     - Daily at 2:00 AM
+    #   "0 */6 * * *"   - Every 6 hours
+    #   "0 0 * * 0"     - Weekly on Sunday at midnight
+    #   "0 3 * * 1-5"   - Weekdays at 3:00 AM
+    schedule:
+      # BACKUP_CRON: Cron expression for backup schedule (default: 2 AM daily)
+      cron: "${BACKUP_CRON:-0 2 * * *}"
+    
+    # Database configuration - SQL Server connection details
+    databases:
+      # Database identifier - can be any name
+      main_db:
+        # Database type - must be "mssql" for SQL Server
+        type: mssql
+        
+        # MSSQL_HOST: SQL Server hostname or IP address (REQUIRED)
+        # Example: "sqlserver.example.com" or "192.168.1.100"
+        host: "${MSSQL_HOST}"
+        
+        # MSSQL_PORT: SQL Server port (default: 1433)
+        port: ${MSSQL_PORT:-1433}
+        
+        # MSSQL_DATABASE: Name of the database to backup (REQUIRED)
+        # Example: "myapp_production"
+        database: "${MSSQL_DATABASE}"
+        
+        # MSSQL_USERNAME: SQL Server authentication username (default: sa)
+        # Note: User must have db_backupoperator or db_owner role
+        username: "${MSSQL_USERNAME:-sa}"
+        
+        # MSSQL_PASSWORD: SQL Server authentication password (REQUIRED)
+        # SECURITY: Never commit this value - always use environment variables
+        password: "${MSSQL_PASSWORD}"
+        
+        # MSSQL_TRUST_CERT: Trust server certificate for TLS connections (default: true)
+        # Set to "false" if using properly signed certificates
+        # Set to "true" for self-signed certificates or non-production environments
+        trustServerCertificate: ${MSSQL_TRUST_CERT:-true}
+        
+        # Optional: Additional sqlpackage arguments
+        # Uncomment and customize as needed:
+        # args: "/p:CompressionOption=Maximum /p:VerifyExtraction=true"
+    
+    # Storage configuration - where backups will be uploaded
+    storages:
+      # Storage identifier - can be any name
+      minio_storage:
+        # Storage type - "minio" for MinIO/S3-compatible storage
+        type: minio
+        
+        # MINIO_BUCKET: MinIO bucket name where backups will be stored (REQUIRED)
+        # Note: Bucket must exist before running backups
+        # Example: "database-backups"
+        bucket: "${MINIO_BUCKET}"
+        
+        # MINIO_ENDPOINT: MinIO server endpoint URL (REQUIRED)
+        # Format: "http://hostname:port" or "https://hostname:port"
+        # Examples:
+        #   "http://minio:9000" (Docker internal)
+        #   "https://minio.example.com" (external with TLS)
+        endpoint: "${MINIO_ENDPOINT}"
+        
+        # MINIO_REGION: MinIO region (default: us-east-1)
+        # For MinIO, this can be any value but must be consistent
+        region: "${MINIO_REGION:-us-east-1}"
+        
+        # MINIO_PATH: Path prefix within the bucket (default: backups/sqlserver)
+        # Backups will be stored at: {bucket}/{path}/{model_name}/{timestamp}/
+        # Example: "backups/sqlserver" results in "my-bucket/backups/sqlserver/sqlserver_backup/2024-01-15T02-00-00/"
+        path: "${MINIO_PATH:-backups/sqlserver}"
+        
+        # MINIO_ACCESS_KEY: MinIO access key ID (REQUIRED)
+        # SECURITY: Never commit this value - always use environment variables
+        access_key_id: "${MINIO_ACCESS_KEY}"
+        
+        # MINIO_SECRET_KEY: MinIO secret access key (REQUIRED)
+        # SECURITY: Never commit this value - always use environment variables
+        secret_access_key: "${MINIO_SECRET_KEY}"
+        
+        # Upload timeout in seconds (default: 300 = 5 minutes)
+        # Increase for large databases or slow network connections
+        timeout: ${MINIO_TIMEOUT:-300}
+        
+        # Maximum number of upload retry attempts (default: 3)
+        # GoBackup will retry failed uploads this many times before giving up
+        max_retries: ${MINIO_MAX_RETRIES:-3}
+        
+        # Optional: Force path style URLs (useful for some S3-compatible services)
+        # Uncomment if you encounter URL-related issues:
+        # force_path_style: true
+
+# Optional: Global configuration settings
+# Uncomment and customize as needed:
+
+# workdir: "/tmp/gobackup"  # Temporary directory for backup files
+# log_level: "info"          # Logging level: debug, info, warn, error
+# keep_local_on_failure: true  # Keep local backup if upload fails
+
+# Optional: Notification configuration
+# Uncomment to enable notifications on backup completion or failure:
+# notifiers:
+#   slack:
+#     webhook_url: "${SLACK_WEBHOOK_URL}"
+#   email:
+#     smtp_host: "${SMTP_HOST}"
+#     smtp_port: ${SMTP_PORT:-587}
+#     smtp_user: "${SMTP_USER}"
+#     smtp_password: "${SMTP_PASSWORD}"
+#     from: "${EMAIL_FROM}"
+#     to: "${EMAIL_TO}"
+
+# Optional: Compression settings
+# GoBackup can compress backups before upload:
+# compressor:
+#   type: tgz  # Options: tgz, zip
+#   level: 9   # Compression level (1-9, higher = better compression but slower)
+
+# Optional: Encryption settings
+# Encrypt backups before upload:
+# encryptor:
+#   type: openssl
+#   password: "${ENCRYPTION_PASSWORD}"
+#   salt: true
+#   base64: true
+
+# Optional: Retention policy
+# Automatically delete old backups:
+# archive:
+#   keep_days: 30      # Keep backups for 30 days
+#   keep_weeks: 8      # Keep weekly backups for 8 weeks
+#   keep_months: 12    # Keep monthly backups for 12 months

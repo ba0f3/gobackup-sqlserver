@@ -1,0 +1,238 @@
+# Docker Compose configuration for GoBackup SQL Server backup system
+# This compose file sets up three services:
+# 1. gobackup - The backup container with GoBackup and sqlpackage
+# 2. sqlserver - Microsoft SQL Server database (for testing/demo)
+# 3. minio - MinIO object storage for backup storage
+
+services:
+  # GoBackup service - performs automated SQL Server backups to MinIO
+  gobackup:
+    # Build the image from the local Dockerfile
+    build:
+      context: .
+      dockerfile: Dockerfile
+    
+    # Alternative: Use pre-built image
+    # image: gobackup-sqlserver:latest
+    
+    # Container name for easy reference
+    container_name: gobackup-sqlserver
+    
+    # Environment variables for backup configuration
+    # These can be overridden by creating a .env file in the same directory
+    environment:
+      # SQL Server connection settings
+      MSSQL_HOST: sqlserver                    # Hostname of SQL Server (service name in Docker network)
+      MSSQL_PORT: 1433                         # SQL Server port
+      MSSQL_DATABASE: ${MSSQL_DATABASE:-TestDB}  # Database to backup (override in .env)
+      MSSQL_USERNAME: ${MSSQL_USERNAME:-sa}    # SQL Server username
+      MSSQL_PASSWORD: ${MSSQL_PASSWORD:-YourStrongPassword123!}  # SQL Server password (CHANGE THIS!)
+      MSSQL_TRUST_CERT: "true"                 # Trust self-signed certificates
+      
+      # MinIO storage settings
+      MINIO_ENDPOINT: http://minio:9000        # MinIO endpoint (service name in Docker network)
+      MINIO_BUCKET: ${MINIO_BUCKET:-backups}   # MinIO bucket name
+      MINIO_REGION: us-east-1                  # MinIO region
+      MINIO_PATH: backups/sqlserver            # Path prefix within bucket
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-minioadmin}  # MinIO access key
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-minioadmin}  # MinIO secret key (CHANGE THIS!)
+      MINIO_TIMEOUT: 300                       # Upload timeout in seconds
+      MINIO_MAX_RETRIES: 3                     # Number of upload retry attempts
+      
+      # Backup schedule and behavior
+      BACKUP_CRON: ${BACKUP_CRON:-0 2 * * *}   # Backup schedule (default: 2 AM daily)
+      RUN_MODE: ${RUN_MODE:-daemon}            # Run mode: "daemon" for scheduled, "once" for single backup
+      SKIP_HEALTH_CHECK: ${SKIP_HEALTH_CHECK:-false}  # Skip startup health checks
+    
+    # Volume mounts
+    volumes:
+      # Optional: Mount custom configuration file (uncomment to use)
+      # - ./gobackup.yml:/etc/gobackup/gobackup.yml:ro
+      
+      # Mount volume for temporary backup files
+      # This allows backups to persist if upload fails
+      - backup-temp:/tmp/gobackup
+      
+      # Optional: Mount directory for logs (uncomment to persist logs)
+      # - ./logs:/var/log/gobackup
+    
+    # Service dependencies - wait for SQL Server and MinIO to be ready
+    depends_on:
+      sqlserver:
+        condition: service_healthy  # Wait for SQL Server to be healthy
+      minio:
+        condition: service_started  # Wait for MinIO to start
+    
+    # Restart policy - restart unless explicitly stopped
+    restart: unless-stopped
+    
+    # Network configuration
+    networks:
+      - backup-network
+    
+    # Resource limits (optional - uncomment to set limits)
+    # deploy:
+    #   resources:
+    #     limits:
+    #       cpus: '1.0'
+    #       memory: 1G
+    #     reservations:
+    #       cpus: '0.5'
+    #       memory: 512M
+
+  # SQL Server service - Microsoft SQL Server database
+  # This is included for testing/demo purposes
+  # In production, you would connect to an existing SQL Server instance
+  sqlserver:
+    # Use official Microsoft SQL Server 2022 image
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    
+    # Container name for easy reference
+    container_name: sqlserver
+    
+    # Environment variables for SQL Server configuration
+    environment:
+      # Accept the End-User Licensing Agreement
+      ACCEPT_EULA: "Y"
+      
+      # SA (system administrator) password
+      # IMPORTANT: Change this to a strong password in production!
+      # Password must meet SQL Server complexity requirements:
+      # - At least 8 characters
+      # - Contains uppercase, lowercase, numbers, and symbols
+      SA_PASSWORD: ${MSSQL_PASSWORD:-YourStrongPassword123!}
+      
+      # Optional: Set SQL Server edition (default: Developer)
+      # MSSQL_PID: Developer
+      
+      # Optional: Enable SQL Server Agent
+      # MSSQL_AGENT_ENABLED: "true"
+    
+    # Volume mounts for persistent data
+    volumes:
+      # Persist SQL Server data files
+      - sqlserver-data:/var/opt/mssql
+      
+      # Optional: Mount initialization scripts (uncomment to use)
+      # Scripts in this directory will run on first startup
+      # - ./init-scripts:/docker-entrypoint-initdb.d
+    
+    # Expose SQL Server port (optional - only needed for external access)
+    # Uncomment to access SQL Server from host machine
+    # ports:
+    #   - "1433:1433"
+    
+    # Health check to verify SQL Server is ready
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P $${SA_PASSWORD} -Q 'SELECT 1' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    
+    # Restart policy
+    restart: unless-stopped
+    
+    # Network configuration
+    networks:
+      - backup-network
+    
+    # Resource limits (optional - uncomment to set limits)
+    # SQL Server requires at least 2GB of memory
+    # deploy:
+    #   resources:
+    #     limits:
+    #       cpus: '2.0'
+    #       memory: 4G
+    #     reservations:
+    #       cpus: '1.0'
+    #       memory: 2G
+
+  # MinIO service - S3-compatible object storage for backups
+  minio:
+    # Use official MinIO image
+    image: minio/minio:latest
+    
+    # Container name for easy reference
+    container_name: minio
+    
+    # MinIO server command with data directory and console address
+    command: server /data --console-address ":9001"
+    
+    # Environment variables for MinIO configuration
+    environment:
+      # Root credentials for MinIO
+      # IMPORTANT: Change these in production!
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-minioadmin}
+      
+      # Optional: Set MinIO region
+      # MINIO_REGION: us-east-1
+      
+      # Optional: Enable browser access
+      # MINIO_BROWSER: "on"
+    
+    # Volume mounts for persistent storage
+    volumes:
+      # Persist MinIO data (uploaded backups)
+      - minio-data:/data
+      
+      # Optional: Mount MinIO configuration (uncomment to use)
+      # - ./minio-config:/root/.minio
+    
+    # Expose MinIO ports
+    ports:
+      # MinIO API port (S3-compatible API)
+      - "${MINIO_API_PORT:-9000}:9000"
+      
+      # MinIO Console port (web UI)
+      - "${MINIO_CONSOLE_PORT:-9001}:9001"
+    
+    # Health check to verify MinIO is ready
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    
+    # Restart policy
+    restart: unless-stopped
+    
+    # Network configuration
+    networks:
+      - backup-network
+    
+    # Resource limits (optional - uncomment to set limits)
+    # deploy:
+    #   resources:
+    #     limits:
+    #       cpus: '1.0'
+    #       memory: 1G
+    #     reservations:
+    #       cpus: '0.5'
+    #       memory: 512M
+
+# Named volumes for persistent data
+volumes:
+  # SQL Server data files
+  sqlserver-data:
+    driver: local
+  
+  # MinIO object storage data
+  minio-data:
+    driver: local
+  
+  # Temporary backup files (before upload to MinIO)
+  backup-temp:
+    driver: local
+
+# Custom network for service communication
+networks:
+  backup-network:
+    driver: bridge
+    # Optional: Configure network settings
+    # ipam:
+    #   config:
+    #     - subnet: 172.28.0.0/16
+

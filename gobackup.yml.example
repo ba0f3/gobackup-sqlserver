@@ -1,0 +1,276 @@
+# GoBackup Configuration Example for SQL Server Backups to MinIO
+# This is a complete, working example configuration file
+# Copy this file to gobackup.yml and customize for your environment
+
+# Models define backup jobs - you can have multiple models for different databases
+models:
+  # Model name - identifies this backup configuration
+  # You can define multiple models to backup different databases
+  sqlserver_backup:
+    # Human-readable description of this backup job
+    description: "SQL Server automated backup to MinIO"
+    
+    # Backup schedule configuration using cron syntax
+    # Format: "minute hour day month weekday"
+    # See "Cron Schedule Examples" section below for common patterns
+    schedule:
+      # Daily at 2:00 AM
+      cron: "0 2 * * *"
+    
+    # Database configuration - SQL Server connection details
+    databases:
+      # Database identifier - can be any name
+      # You can define multiple databases under one model
+      main_db:
+        # Database type - must be "mssql" for SQL Server
+        type: mssql
+        
+        # SQL Server hostname or IP address
+        # Examples: "sqlserver.example.com", "192.168.1.100", "localhost"
+        host: "sqlserver"
+        
+        # SQL Server port (standard port is 1433)
+        port: 1433
+        
+        # Name of the database to backup
+        database: "myapp_production"
+        
+        # SQL Server authentication username
+        # Note: User must have db_backupoperator or db_owner role
+        username: "sa"
+        
+        # SQL Server authentication password
+        # SECURITY WARNING: For production, use environment variables instead
+        # Example: password: "${MSSQL_PASSWORD}"
+        password: "YourStrongPassword123!"
+        
+        # Trust server certificate for TLS connections
+        # Set to true for self-signed certificates or non-production environments
+        # Set to false if using properly signed certificates
+        trustServerCertificate: true
+        
+        # Optional: Additional sqlpackage arguments
+        # Uncomment and customize as needed:
+        # args: "/p:CompressionOption=Maximum /p:VerifyExtraction=true"
+    
+    # Storage configuration - where backups will be uploaded
+    storages:
+      # Storage identifier - can be any name
+      # You can define multiple storage backends
+      minio_storage:
+        # Storage type - "minio" for MinIO/S3-compatible storage
+        type: minio
+        
+        # MinIO bucket name where backups will be stored
+        # Note: Bucket must exist before running backups
+        bucket: "database-backups"
+        
+        # MinIO server endpoint URL
+        # Format: "http://hostname:port" or "https://hostname:port"
+        # Examples:
+        #   "http://minio:9000" (Docker internal network)
+        #   "https://minio.example.com" (external with TLS)
+        #   "http://192.168.1.50:9000" (IP address)
+        endpoint: "http://minio:9000"
+        
+        # MinIO region (for MinIO, this can be any value but must be consistent)
+        region: "us-east-1"
+        
+        # Path prefix within the bucket
+        # Backups will be stored at: {bucket}/{path}/{model_name}/{timestamp}/
+        # Example: "database-backups/backups/sqlserver/sqlserver_backup/2024-12-24T02-00-00/"
+        path: "backups/sqlserver"
+        
+        # MinIO access key ID
+        # SECURITY WARNING: For production, use environment variables instead
+        # Example: access_key_id: "${MINIO_ACCESS_KEY}"
+        access_key_id: "minioadmin"
+        
+        # MinIO secret access key
+        # SECURITY WARNING: For production, use environment variables instead
+        # Example: secret_access_key: "${MINIO_SECRET_KEY}"
+        secret_access_key: "minioadmin"
+        
+        # Upload timeout in seconds (5 minutes)
+        # Increase for large databases or slow network connections
+        timeout: 300
+        
+        # Maximum number of upload retry attempts
+        # GoBackup will retry failed uploads this many times before giving up
+        max_retries: 3
+        
+        # Optional: Force path style URLs (useful for some S3-compatible services)
+        # Uncomment if you encounter URL-related issues:
+        # force_path_style: true
+
+# Optional: Global configuration settings
+# Uncomment and customize as needed:
+
+# Working directory for temporary backup files
+# Ensure this directory has sufficient space for your database backups
+# workdir: "/tmp/gobackup"
+
+# Logging level: debug, info, warn, error
+# log_level: "info"
+
+# Keep local backup files if upload fails
+# Useful for manual recovery in case of storage backend issues
+# keep_local_on_failure: true
+
+# Optional: Notification configuration
+# Get notified when backups complete or fail
+# Uncomment to enable notifications:
+# notifiers:
+#   # Slack notifications
+#   slack:
+#     webhook_url: "https://hooks.slack.com/services/YOUR/WEBHOOK/URL"
+#     
+#   # Email notifications
+#   email:
+#     smtp_host: "smtp.gmail.com"
+#     smtp_port: 587
+#     smtp_user: "your-email@example.com"
+#     smtp_password: "your-app-password"
+#     from: "backups@example.com"
+#     to: "admin@example.com"
+
+# Optional: Compression settings
+# Compress backups before upload to save storage space and bandwidth
+# Note: .bacpac files are already compressed, so this may not provide much benefit
+# compressor:
+#   type: tgz  # Options: tgz, zip
+#   level: 9   # Compression level (1-9, higher = better compression but slower)
+
+# Optional: Encryption settings
+# Encrypt backups before upload for additional security
+# encryptor:
+#   type: openssl
+#   password: "your-encryption-password"
+#   salt: true
+#   base64: true
+
+# Optional: Retention policy
+# Automatically delete old backups to manage storage costs
+# archive:
+#   keep_days: 30      # Keep daily backups for 30 days
+#   keep_weeks: 8      # Keep weekly backups for 8 weeks
+#   keep_months: 12    # Keep monthly backups for 12 months
+
+# ============================================================================
+# CRON SCHEDULE EXAMPLES
+# ============================================================================
+# Cron format: "minute hour day month weekday"
+# Fields:
+#   minute:   0-59
+#   hour:     0-23 (0 = midnight, 12 = noon)
+#   day:      1-31
+#   month:    1-12
+#   weekday:  0-7 (0 and 7 = Sunday, 1 = Monday, etc.)
+#
+# Special characters:
+#   *   = any value
+#   */n = every n units
+#   ,   = list of values
+#   -   = range of values
+#
+# Common Examples:
+#
+# Daily backups:
+#   "0 2 * * *"       - Every day at 2:00 AM
+#   "30 3 * * *"      - Every day at 3:30 AM
+#   "0 0 * * *"       - Every day at midnight
+#
+# Multiple times per day:
+#   "0 */6 * * *"     - Every 6 hours (00:00, 06:00, 12:00, 18:00)
+#   "0 */4 * * *"     - Every 4 hours
+#   "0 0,12 * * *"    - Twice daily (midnight and noon)
+#   "0 2,14 * * *"    - Twice daily (2 AM and 2 PM)
+#
+# Weekly backups:
+#   "0 0 * * 0"       - Every Sunday at midnight
+#   "0 3 * * 1"       - Every Monday at 3:00 AM
+#   "0 0 * * 6"       - Every Saturday at midnight
+#
+# Weekday backups:
+#   "0 3 * * 1-5"     - Monday through Friday at 3:00 AM
+#   "0 22 * * 1-5"    - Monday through Friday at 10:00 PM
+#
+# Monthly backups:
+#   "0 1 1 * *"       - First day of every month at 1:00 AM
+#   "0 2 15 * *"      - 15th day of every month at 2:00 AM
+#   "0 0 1 1 *"       - January 1st at midnight (yearly)
+#
+# Hourly backups:
+#   "0 * * * *"       - Every hour at minute 0
+#   "30 * * * *"      - Every hour at minute 30
+#   "*/15 * * * *"    - Every 15 minutes
+#
+# ============================================================================
+# MULTIPLE DATABASE EXAMPLE
+# ============================================================================
+# You can backup multiple databases by defining multiple models:
+#
+# models:
+#   production_db:
+#     description: "Production database backup"
+#     schedule:
+#       cron: "0 2 * * *"  # Daily at 2 AM
+#     databases:
+#       prod:
+#         type: mssql
+#         host: "sqlserver-prod"
+#         database: "production"
+#         username: "sa"
+#         password: "${PROD_DB_PASSWORD}"
+#     storages:
+#       minio_prod:
+#         type: minio
+#         bucket: "prod-backups"
+#         endpoint: "http://minio:9000"
+#         path: "databases/production"
+#         access_key_id: "${MINIO_ACCESS_KEY}"
+#         secret_access_key: "${MINIO_SECRET_KEY}"
+#
+#   staging_db:
+#     description: "Staging database backup"
+#     schedule:
+#       cron: "0 4 * * *"  # Daily at 4 AM
+#     databases:
+#       staging:
+#         type: mssql
+#         host: "sqlserver-staging"
+#         database: "staging"
+#         username: "sa"
+#         password: "${STAGING_DB_PASSWORD}"
+#     storages:
+#       minio_staging:
+#         type: minio
+#         bucket: "staging-backups"
+#         endpoint: "http://minio:9000"
+#         path: "databases/staging"
+#         access_key_id: "${MINIO_ACCESS_KEY}"
+#         secret_access_key: "${MINIO_SECRET_KEY}"
+#
+# ============================================================================
+# ENVIRONMENT VARIABLE USAGE
+# ============================================================================
+# For production deployments, use environment variables for sensitive data:
+#
+# databases:
+#   main_db:
+#     host: "${MSSQL_HOST}"
+#     database: "${MSSQL_DATABASE}"
+#     username: "${MSSQL_USERNAME:-sa}"  # Default to "sa" if not set
+#     password: "${MSSQL_PASSWORD}"
+#
+# storages:
+#   minio_storage:
+#     bucket: "${MINIO_BUCKET}"
+#     endpoint: "${MINIO_ENDPOINT}"
+#     access_key_id: "${MINIO_ACCESS_KEY}"
+#     secret_access_key: "${MINIO_SECRET_KEY}"
+#
+# Then set environment variables when running the container:
+#   docker run -e MSSQL_HOST=sqlserver -e MSSQL_PASSWORD=secret ...
+#
+# ============================================================================
