@@ -262,6 +262,12 @@ docker inspect --format='{{.State.Health.Status}}' gobackup-sqlserver
 - Check available disk space in container
 - Review sqlpackage error output in logs
 
+**"Unsupported elements" error:**
+- The Export action doesn't support ignoring unsupported elements
+- **Recommended solution:** Remove unsupported elements from the database
+- Common unsupported elements: certificates, symmetric keys, certain permissions, encrypted objects
+- **Alternative:** Use sqlpackage Extract action manually to create .dacpac files with `/p:ExtractAllTableData=True /p:VerifyExtraction=False`
+
 **Upload fails:**
 - Verify MinIO credentials are correct
 - Check MinIO bucket exists

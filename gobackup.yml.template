@@ -54,6 +54,8 @@ models:
         # Explicitly pass certificate trust setting to sqlpackage
         # This ensures certificate validation is handled correctly
         # Additional sqlpackage arguments can be appended to this
+        # Note: Export action doesn't support ignoring unsupported elements
+        # For unsupported schema elements, remove them from the database or use Extract action
         args: "${MSSQL_ARGS:-/SourceTrustServerCertificate:True}"
     
     # Storage configuration - where backups will be uploaded

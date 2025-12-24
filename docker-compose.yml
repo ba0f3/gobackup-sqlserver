@@ -28,6 +28,9 @@ services:
       MSSQL_USERNAME: ${MSSQL_USERNAME:-sa}    # SQL Server username
       MSSQL_PASSWORD: ${MSSQL_PASSWORD:-YourStrongPassword123!}  # SQL Server password (CHANGE THIS!)
       MSSQL_TRUST_CERT: "true"                 # Trust self-signed certificates
+      # Note: MSSQL_IGNORE_UNSUPPORTED is not supported for Export action
+      # For unsupported elements, remove them from the database or use Extract action manually
+      # MSSQL_IGNORE_UNSUPPORTED: ${MSSQL_IGNORE_UNSUPPORTED:-false}
       
       # MinIO storage settings
       MINIO_ENDPOINT: http://minio:9000        # MinIO endpoint (service name in Docker network)

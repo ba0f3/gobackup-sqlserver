@@ -103,7 +103,7 @@ generate_config() {
     
     # Use envsubst to substitute environment variables in template
     # Export all variables to make them available to envsubst
-    export MSSQL_HOST MSSQL_PORT MSSQL_DATABASE MSSQL_USERNAME MSSQL_PASSWORD MSSQL_TRUST_CERT
+    export MSSQL_HOST MSSQL_PORT MSSQL_DATABASE MSSQL_USERNAME MSSQL_PASSWORD MSSQL_TRUST_CERT MSSQL_IGNORE_UNSUPPORTED
     export MINIO_ENDPOINT MINIO_BUCKET MINIO_REGION MINIO_PATH MINIO_ACCESS_KEY MINIO_SECRET_KEY
     export MINIO_TIMEOUT MINIO_MAX_RETRIES BACKUP_CRON
     
@@ -113,6 +113,16 @@ generate_config() {
         export MSSQL_ARGS="/SourceTrustServerCertificate:True"
     else
         export MSSQL_ARGS="/SourceTrustServerCertificate:False"
+    fi
+    
+    # Note: MSSQL_IGNORE_UNSUPPORTED is not directly supported for Export action
+    # The Export action doesn't have properties to ignore unsupported elements
+    # Users encountering unsupported elements should remove them from the database
+    # or use Extract action with /p:ExtractAllTableData=True /p:VerifyExtraction=False
+    if [ "${MSSQL_IGNORE_UNSUPPORTED:-false}" = "true" ]; then
+        log_warning "MSSQL_IGNORE_UNSUPPORTED is set but not supported for Export action"
+        log_warning "For unsupported elements, consider removing them from the database"
+        log_warning "Alternatively, use Extract action with /p:ExtractAllTableData=True /p:VerifyExtraction=False"
     fi
     
     # Substitute variables and write to config file

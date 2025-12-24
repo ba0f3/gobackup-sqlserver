@@ -51,6 +51,13 @@ These variables have sensible defaults but can be customized:
 - Set to `false` when using properly signed SSL certificates
 - Required for SQL Server instances with TLS/SSL enabled
 
+**Handling Unsupported Schema Elements:**
+- **Note:** The Export action (used by GoBackup for .bacpac files) doesn't support ignoring unsupported elements
+- If you encounter "unsupported elements" errors, you have these options:
+  1. **Recommended:** Remove unsupported elements from the database (certificates, symmetric keys, etc.)
+  2. **Alternative:** Use sqlpackage Extract action manually with `/p:ExtractAllTableData=True /p:VerifyExtraction=False` to create a .dacpac file
+- Common unsupported elements include: certificates, symmetric keys, certain permissions, encrypted objects
+
 #### MinIO Options
 
 | Variable | Default | Description |
@@ -161,10 +168,12 @@ databases:
 
 The `args` field allows passing additional arguments to sqlpackage. Common options:
 
+- `/SourceTrustServerCertificate:True` - Trust server certificate (automatically added based on `MSSQL_TRUST_CERT`)
 - `/p:CompressionOption=Maximum` - Maximum compression for .bacpac files
-- `/p:VerifyExtraction=true` - Verify backup integrity after creation
-- `/p:Storage=File` - Use file-based storage (default)
 - `/p:CommandTimeout=3600` - Set command timeout in seconds
+- `/p:Storage=File` - Use file-based storage (default)
+
+**Note:** Properties like `/p:ExtractAllTableData` and `/p:VerifyExtraction` are only valid for the Extract action, not the Export action used by GoBackup for .bacpac files.
 
 Example with multiple arguments:
 ```yaml

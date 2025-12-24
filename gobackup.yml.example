@@ -53,6 +53,10 @@ models:
         # This ensures certificate validation is handled correctly
         # Additional sqlpackage arguments can be appended to this
         # Example: args: "/SourceTrustServerCertificate:True /p:CompressionOption=Maximum"
+        # 
+        # Note: Export action doesn't support ignoring unsupported elements
+        # For unsupported schema elements, remove them from the database
+        # or use Extract action manually with /p:ExtractAllTableData=True /p:VerifyExtraction=False
         args: "/SourceTrustServerCertificate:True"
     
     # Storage configuration - where backups will be uploaded
